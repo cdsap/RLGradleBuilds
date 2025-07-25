@@ -89,6 +89,10 @@ inputs:
     description: 'URL of the Firebase function for updating experiment status'
     required: false
     default: ""
+  rl-actions:
+    description: 'RL-generated action parameters (JSON string)'
+    required: false
+    default: '{}'
 
 outputs:
   mean_build_duration:

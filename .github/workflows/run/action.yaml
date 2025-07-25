@@ -42,6 +42,10 @@ inputs:
   cache-excludes:
     description: 'Patterns to exclude from cache'
     required: true
+  rl-actions:
+    description: 'RL-generated action parameters (JSON string)'
+    required: false
+    default: '{}'
 
 runs:
   using: 'composite'

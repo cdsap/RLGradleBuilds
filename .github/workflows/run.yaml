@@ -51,6 +51,10 @@ on:
         description: "Experiment ID for RL tracking"
         required: false
         default: ""
+      rl_actions:
+        description: "RL-generated action parameters (JSON string)"
+        required: false
+        default: "{}"
 
 run-name: "${{ github.event.inputs.repository }}-${{ github.event.inputs.mode }}-${{ github.event.inputs.variant }}-${{ github.event.inputs.task }}"
 
@@ -87,7 +91,7 @@ jobs:
           cache-exclude-script: "${{ env.cache_exclude_content }}"
           task: "${{ github.event.inputs.task }}"
           mode: "${{ github.event.inputs.mode }}"
-          experiment-id: "${{ github.run_number }}"
+          experiment-id: "${{ github.event.inputs.experiment_id || github.run_number }}"
           variant: ${{ github.event.inputs.variant }}
           api-key: ${{ secrets.DV_ACCESS_KEY }}
           repository: ${{ github.event.inputs.repository }}
@@ -96,6 +100,7 @@ jobs:
           jdk_version: ${{ fromJson(github.event.inputs.java_args).javaVersionVariantA }}
           jdk_vendor: ${{ fromJson(github.event.inputs.java_args).javaVendorVariantA }}
           cache-url: ${{ secrets.CI_URL_CACHE_NODE }}
+          rl-actions: "${{ github.event.inputs.rl_actions }}"
       - uses: actions/checkout@v4
     outputs:
       iterations: ${{ needs.iterations.outputs.iterations }}
@@ -118,7 +123,7 @@ jobs:
         with:
           task: "${{ github.event.inputs.task }}"
           mode: "${{ github.event.inputs.mode }}"
-          experiment-id: "${{ github.repository_owner }}-${{ github.run_number }}"
+          experiment-id: "${{ github.event.inputs.experiment_id || github.repository_owner }}-${{ github.run_number }}"
           execution-number: ${{ github.run_number }}
           variant: ${{ github.event.inputs.variant }}
           api-key: ${{ secrets.DV_ACCESS_KEY }}
@@ -129,6 +134,7 @@ jobs:
           extra-args: ${{ fromJson(github.event.inputs.extra_build_args).extraArgsVariantA }}
           jdk_version: ${{ fromJson(github.event.inputs.java_args).javaVersionVariantA }}
           jdk_vendor: ${{ fromJson(github.event.inputs.java_args).javaVendorVariantA }}
+          rl-actions: "${{ github.event.inputs.rl_actions }}"
       - uses: actions/checkout@v4
 
 
@@ -171,3 +177,4 @@ jobs:
           rl-agent-url: "https://rl-agent-428721187836.us-central1.run.app"
           send-feedback: "true"
           firebase-function-url: "https://us-central1-YOUR_PROJECT_ID.cloudfunctions.net"
+          rl-actions: "${{ github.event.inputs.rl_actions }}"
