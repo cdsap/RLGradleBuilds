@@ -89,11 +89,10 @@ runs:
     - name: Execute Gradle Build
       id: gradle-build
       run: |
-         echo "RL Actions: ${{ fromJson(inputs.rl-actions) }}"
-    
-         echo "Max Workers: ${{ fromJson(inputs.rl-actions).max_workers }}"
-         echo "Gradle Heap: ${{ fromJson(inputs.rl-actions).gradle_heap_gb }}"
-         echo "Kotlin Heap: ${{ fromJson(inputs.rl-actions).kotlin_heap_gb }}"
+        echo "RL Actions: ${{ fromJson(inputs.rl-actions) }}"
+        echo "Max Workers: ${{ fromJson(inputs.rl-actions).max_workers }}"
+        echo "Gradle Heap: ${{ fromJson(inputs.rl-actions).gradle_heap_gb }}"
+        echo "Kotlin Heap: ${{ fromJson(inputs.rl-actions).kotlin_heap_gb }}"
         ./gradlew ${{ inputs.task }} ${{ inputs.extra-args }} \
           -Dscan.tag.seed_${{ inputs.variant-prefix }}${{ inputs.variant }} \
           -Dscan.tag.seed-"${{ inputs.mode }}" \
