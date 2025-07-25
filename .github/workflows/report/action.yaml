@@ -85,6 +85,10 @@ inputs:
     description: 'Whether to send feedback to RL agent'
     required: false
     default: "false"
+  firebase-function-url:
+    description: 'URL of the Firebase function for updating experiment status'
+    required: false
+    default: ""
 
 outputs:
   mean_build_duration:
@@ -229,6 +233,27 @@ runs:
           echo "Feedback sent successfully"
         else
           echo "Skipping feedback to RL agent (disabled or no URL provided)"
+        fi
+        
+        # Update experiment status in Firestore
+        if [ -n "${{ inputs.firebase-function-url }}" ]; then
+          echo "Updating experiment status in Firestore..."
+          curl -X POST "${{ inputs.firebase-function-url }}/updateExperimentStatus" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"experiment_id\": \"${{ inputs.experiment-id }}\",
+              \"status\": \"completed\",
+              \"workflow_run_id\": \"${{ inputs.run_id }}\",
+              \"metrics\": {
+                \"mean_build_duration\": ${MEAN_BUILD_DURATION},
+                \"gradle_gc_time\": ${GRADLE_GC_TIME},
+                \"kotlin_gc_time\": ${KOTLIN_GC_TIME},
+                \"kotlin_compile_duration\": ${KOTLIN_COMPILE_DURATION}
+              }
+            }"
+          echo "Experiment status updated in Firestore"
+        else
+          echo "Skipping Firestore update (no URL provided)"
         fi
                 
       shell: bash
