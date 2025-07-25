@@ -1,0 +1,91 @@
+name: 'Experiment Runner'
+
+inputs:
+  task:
+    description: 'The Gradle task to execute'
+    required: true
+  variant:
+    description: 'The variant to use for the experiment'
+    required: true
+  variant-prefix:
+    description: 'Prefix for the variant used in tagging'
+    required: true
+  experiment-id:
+    description: 'Unique identifier for the experiment'
+    required: true
+  api-key:
+    description: 'API key for accessing Develocity or related services'
+    required: true
+  repository:
+    description: 'GitHub repository to check out'
+    required: true
+  jdk_version:
+    description: 'Java version to use (default is 17)'
+    required: false
+    default: 17
+  jdk_vendor:
+    description: 'JDK vendor to use (default is zulu)'
+    required: false
+    default: 'zulu'
+  execution-number:
+    description: 'Execution number used for caching purposes'
+    required: true
+  mode:
+    description: 'Mode of execution relative to caching'
+    required: true
+  extra-args:
+    description: 'Extra arguments to pass to the Gradle command'
+    required: true
+  cache-url:
+    description: 'URL for the cache node if applicable'
+    required: false
+  cache-excludes:
+    description: 'Patterns to exclude from cache'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: ${{ inputs.jdk_vendor }}
+        java-version: ${{ inputs.jdk_version }}
+
+    - name: Download Project Workspace
+      uses: actions/download-artifact@v4
+      with:
+        name: project-workspace-${{ inputs.variant-prefix }}${{ inputs.variant }}
+        path: ${{ github.workspace }}
+
+    - name: Restore File Permissions
+      run: |
+        chmod +x ./gradlew
+        chmod +x ./gradlew.bat
+        find . -name "*.sh" -exec chmod +x {} \;
+      shell: bash
+
+    - name: Setup Gradle (Cache Mode)
+      if: github.event.inputs.mode != 'no caching'
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        cache-read-only: true
+        add-job-summary: 'never'
+        gradle-home-cache-excludes: ${{ inputs.cache-excludes }}
+      env:
+        GRADLE_BUILD_ACTION_CACHE_KEY_JOB: 'seed'
+        GRADLE_BUILD_ACTION_CACHE_KEY_JOB_INSTANCE: ${{ inputs.execution-number }}-${{ inputs.variant }}
+
+    - name: Execute Gradle Build
+      id: gradle-build
+      run: |
+        ./gradlew ${{ inputs.task }} ${{ inputs.extra-args }} \
+          -Dscan.tag.${{ inputs.experiment-id }}_${{ inputs.variant-prefix }}${{ inputs.variant }} \
+          -Dscan.tag."${{ inputs.mode }}" \
+          -Dscan.tag.experiment \
+          -Dscan.tag.${{ inputs.experiment-id }}
+      shell: bash
+      env:
+        DEVELOCITY_ACCESS_KEY: ${{ inputs.api-key }}
+        GRADLE_BUILD_ACTION_CACHE_KEY_JOB: 'seed'
+        CI_URL_CACHE_NODE: ${{ inputs.cache-url }}
