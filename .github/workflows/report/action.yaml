@@ -78,6 +78,15 @@ inputs:
     required: true
     default: ""
 
+outputs:
+  mean_build_duration:
+    description: 'Mean build duration in milliseconds'
+  gradle_gc_time:
+    description: 'Gradle process garbage collection time'
+  kotlin_gc_time:
+    description: 'Kotlin process garbage collection time'
+  kotlin_compile_duration:
+    description: 'Kotlin compile task duration in milliseconds'
 
 runs:
   using: 'composite'
@@ -170,6 +179,28 @@ runs:
                 --process-report \
                 $tagsParsed
         
-        cat $(ls -t experiment_results_*.csv | head -n 1)                
+        cat $(ls -t experiment_results_*.csv | head -n 1)
+        
+        # Extract specific metrics from the CSV file
+        CSV_FILE=$(ls -t experiment_results_*.csv | head -n 1)
+        
+        # Extract metrics using awk
+        MEAN_BUILD_DURATION=$(awk -F',' '$1 == "Build" && $2 == "Build time" {print $3}' "$CSV_FILE")
+        GRADLE_GC_TIME=$(awk -F',' '$1 == "Gradle process state" && $2 == "Gradle-Process-gcTime" {print $3}' "$CSV_FILE")
+        KOTLIN_GC_TIME=$(awk -F',' '$1 == "Kotlin process state" && $2 == "Kotlin-Process-gcTime" {print $3}' "$CSV_FILE")
+        KOTLIN_COMPILE_DURATION=$(awk -F',' '$1 == "Task Type" && $2 == "org.jetbrains.kotlin.gradle.tasks.KotlinCompile" {print $3}' "$CSV_FILE")
+        
+        # Output metrics as GitHub Actions outputs
+        echo "mean_build_duration=$MEAN_BUILD_DURATION" >> $GITHUB_OUTPUT
+        echo "gradle_gc_time=$GRADLE_GC_TIME" >> $GITHUB_OUTPUT
+        echo "kotlin_gc_time=$KOTLIN_GC_TIME" >> $GITHUB_OUTPUT
+        echo "kotlin_compile_duration=$KOTLIN_COMPILE_DURATION" >> $GITHUB_OUTPUT
+        
+        # Also print for debugging
+        echo "Extracted Metrics:"
+        echo "Mean Build Duration: ${MEAN_BUILD_DURATION} ms"
+        echo "Gradle GC Time: ${GRADLE_GC_TIME}"
+        echo "Kotlin GC Time: ${KOTLIN_GC_TIME}"
+        echo "Kotlin Compile Duration: ${KOTLIN_COMPILE_DURATION} ms"
                 
       shell: bash
