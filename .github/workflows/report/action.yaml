@@ -77,6 +77,14 @@ inputs:
     description: 'Deployment key'
     required: true
     default: ""
+  rl-agent-url:
+    description: 'URL of the RL agent for sending feedback'
+    required: false
+    default: ""
+  send-feedback:
+    description: 'Whether to send feedback to RL agent'
+    required: false
+    default: "false"
 
 outputs:
   mean_build_duration:
@@ -109,11 +117,7 @@ runs:
 
         # Parse and format tags input into the required format
         tags="${{ inputs.tags }}"
-        arrayTags=(${tags//,/ })
-        tagsParsed=""
-        for val in "${arrayTags[@]}"; do
-          tagsParsed="$tagsParsed --variants=$val"
-        done
+    
 
         # Set optional flags based on input values
         profile=""
@@ -173,11 +177,12 @@ runs:
         RUN_ID="${{ inputs.run_id }}"
         API_KEY="${{ inputs.api-key }}"
   
-    
+         echo $tags
+         
         ./build-experiment-results --url="https://ge.solutions-team.gradle.com/" \
                 --api-key="$API_KEY" \
                 --process-report \
-                $tagsParsed
+                --variants="$tags"
         
         cat $(ls -t experiment_results_*.csv | head -n 1)
         
@@ -202,5 +207,28 @@ runs:
         echo "Gradle GC Time: ${GRADLE_GC_TIME}"
         echo "Kotlin GC Time: ${KOTLIN_GC_TIME}"
         echo "Kotlin Compile Duration: ${KOTLIN_COMPILE_DURATION} ms"
+        
+        # Send feedback to RL agent if enabled
+        if [ "${{ inputs.send-feedback }}" == "true" ] && [ -n "${{ inputs.rl-agent-url }}" ]; then
+          echo "Sending feedback to RL agent..."
+          curl -X POST "${{ inputs.rl-agent-url }}/send-feedback" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"experiment_id\": \"${{ inputs.experiment-id }}\",
+              \"build_time\": ${MEAN_BUILD_DURATION},
+              \"gradle_gc_time\": ${GRADLE_GC_TIME},
+              \"kotlin_gc_time\": ${KOTLIN_GC_TIME},
+              \"kotlin_compile_duration\": ${KOTLIN_COMPILE_DURATION},
+              \"state\": {
+                \"repository\": \"${{ inputs.repository }}\",
+                \"task\": \"${{ inputs.task }}\",
+                \"mode\": \"${{ inputs.mode }}\",
+                \"run_id\": \"${{ inputs.run_id }}\"
+              }
+            }"
+          echo "Feedback sent successfully"
+        else
+          echo "Skipping feedback to RL agent (disabled or no URL provided)"
+        fi
                 
       shell: bash
