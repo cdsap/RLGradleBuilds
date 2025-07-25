@@ -22,11 +22,6 @@ on:
         default: 'dependencies cache'
         options:
           - 'dependencies cache'
-      os_args:
-        description: "Operating system configurations for variants"
-        type: string
-        default: "{variantA:'ubuntu-latest',variantB:'ubuntu-latest'}"
-        required: true
       java_args:
         description: "JDK vendor and version for each variant"
         type: string
