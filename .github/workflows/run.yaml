@@ -171,5 +171,5 @@ jobs:
           deployment-key: ${{ secrets.GH_BUILD_DEPLOYMENT }}
           rl-agent-url: "https://rl-agent-428721187836.us-central1.run.app"
           send-feedback: "true"
-          firebase-function-url: "https://us-central1-YOUR_PROJECT_ID.cloudfunctions.net"
+          firebase-function-url: "https://us-central1-rlgradleld.cloudfunctions.net"
           rl-actions: "${{ github.event.inputs.rl_actions }}"

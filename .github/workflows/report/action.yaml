@@ -88,7 +88,7 @@ inputs:
   firebase-function-url:
     description: 'URL of the Firebase function for updating experiment status'
     required: false
-    default: ""
+    default: "https://us-central1-rlgradleld.cloudfunctions.net"
   rl-actions:
     description: 'RL-generated action parameters (JSON string)'
     required: false
@@ -243,18 +243,16 @@ runs:
         # Update experiment status in Firestore
         if [ -n "${{ inputs.firebase-function-url }}" ]; then
           echo "Updating experiment status in Firestore..."
-          curl -X POST "${{ inputs.firebase-function-url }}/updateExperimentStatus" \
+          curl -X POST "${{ inputs.firebase-function-url }}/updateExperimentStatusData" \
             -H "Content-Type: application/json" \
             -d "{
               \"experiment_id\": \"${{ inputs.experiment-id }}\",
               \"status\": \"completed\",
               \"workflow_run_id\": \"${{ inputs.run_id }}\",
-              \"metrics\": {
-                \"mean_build_duration\": ${MEAN_BUILD_DURATION},
-                \"gradle_gc_time\": ${GRADLE_GC_TIME},
-                \"kotlin_gc_time\": ${KOTLIN_GC_TIME},
-                \"kotlin_compile_duration\": ${KOTLIN_COMPILE_DURATION}
-              }
+              \"build_time\": ${MEAN_BUILD_DURATION},
+              \"gradle_gc_time\": ${GRADLE_GC_TIME},
+              \"kotlin_gc_time\": ${KOTLIN_GC_TIME},
+              \"kotlin_compile_duration\": ${KOTLIN_COMPILE_DURATION}
             }"
           echo "Experiment status updated in Firestore"
         else
