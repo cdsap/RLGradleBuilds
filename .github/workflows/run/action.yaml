@@ -89,8 +89,8 @@ runs:
           -Dscan.tag.${{ inputs.experiment-id }}_${{ inputs.variant-prefix }}${{ inputs.variant }} \
           -Dscan.tag."${{ inputs.mode }}" \
           -Dscan.tag.experiment \
-          -Dscan.tag.${{ inputs.experiment-id }}
-          -Dscan.tag.$experiment_id_value
+          -Dscan.tag."${{ inputs.experiment-id }}" \
+          -Dscan.tag."$experiment_id_value"
       shell: bash
       env:
         DEVELOCITY_ACCESS_KEY: ${{ inputs.api-key }}
