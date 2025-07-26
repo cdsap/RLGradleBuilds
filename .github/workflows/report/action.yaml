@@ -186,11 +186,12 @@ runs:
         API_KEY="${{ inputs.api-key }}"
   
          echo $tags
-         
+         experiment_id_value=${{ inputs.experiment-id }}_W${{ fromJson(inputs.rl-actions).max_workers }}_G${{ fromJson(inputs.rl-actions).gradle_heap_gb }}_K${{ fromJson(inputs.rl-actions).kotlin_heap_gb }}
+        
         ./build-experiment-results --url="https://ge.solutions-team.gradle.com/" \
                 --api-key="$API_KEY" \
                 --process-report \
-                --variants="$tags"
+                --variants="$experiment_id_value"
         
         cat $(ls -t experiment_results_*.csv | head -n 1)
         

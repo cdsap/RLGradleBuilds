@@ -86,17 +86,56 @@ runs:
       env:
         GRADLE_BUILD_ACTION_CACHE_KEY_JOB_INSTANCE: ${{ inputs.experiment-id }}-${{ inputs.variant }}
 
-    - name: Execute Gradle Build
-      id: gradle-build
+    - name: Apply RL Optimizations to Gradle Properties
+      id: apply-rl-optimizations
       run: |
         echo "RL Actions: ${{ fromJson(inputs.rl-actions) }}"
         echo "Max Workers: ${{ fromJson(inputs.rl-actions).max_workers }}"
         echo "Gradle Heap: ${{ fromJson(inputs.rl-actions).gradle_heap_gb }}"
         echo "Kotlin Heap: ${{ fromJson(inputs.rl-actions).kotlin_heap_gb }}"
+        # Create or update gradle.properties with RL optimizations
+        GRADLE_PROPS_FILE="gradle.properties"
+        
+        # Update org.gradle.jvmargs with gradle heap
+        if grep -q "org.gradle.jvmargs" "$GRADLE_PROPS_FILE"; then
+          # Update existing org.gradle.jvmargs
+          sed -i "s/-Xmx[0-9]*[gG]/-Xmx${{ fromJson(inputs.rl-actions).gradle_heap_gb }}g/g" "$GRADLE_PROPS_FILE"
+        else
+          # Add org.gradle.jvmargs if it doesn't exist
+          echo "org.gradle.jvmargs=-Xmx${{ fromJson(inputs.rl-actions).gradle_heap_gb }}g" >> "$GRADLE_PROPS_FILE"
+        fi
+        
+        # Update org.gradle.workers.max with max workers
+        if grep -q "org.gradle.workers.max" "$GRADLE_PROPS_FILE"; then
+          # Update existing org.gradle.workers.max
+          sed -i "s/org.gradle.workers.max=[0-9]*/org.gradle.workers.max=${{ fromJson(inputs.rl-actions).max_workers }}/g" "$GRADLE_PROPS_FILE"
+        else
+          # Add org.gradle.workers.max if it doesn't exist
+          echo "org.gradle.workers.max=${{ fromJson(inputs.rl-actions).max_workers }}" >> "$GRADLE_PROPS_FILE"
+        fi
+        
+        # Update kotlin.daemon.jvmargs with kotlin heap
+        if grep -q "kotlin.daemon.jvmargs" "$GRADLE_PROPS_FILE"; then
+          # Update existing kotlin.daemon.jvmargs
+          sed -i "s/-Xmx[0-9]*[gG]/-Xmx${{ fromJson(inputs.rl-actions).kotlin_heap_gb }}g/g" "$GRADLE_PROPS_FILE"
+        else
+          # Add kotlin.daemon.jvmargs if it doesn't exist
+          echo "kotlin.daemon.jvmargs=-Xmx${{ fromJson(inputs.rl-actions).kotlin_heap_gb }}g" >> "$GRADLE_PROPS_FILE"
+        fi
+        
+        echo "Updated gradle.properties with RL optimizations:"
+        cat "$GRADLE_PROPS_FILE"
+      shell: bash
+
+    - name: Execute Gradle Build
+      id: gradle-build
+      run: |
+        experiment_id_value=${{ inputs.experiment-id }}_W${{ fromJson(inputs.rl-actions).max_workers }}_G${{ fromJson(inputs.rl-actions).gradle_heap_gb }}_K${{ fromJson(inputs.rl-actions).kotlin_heap_gb }}
         ./gradlew ${{ inputs.task }} ${{ inputs.extra-args }} \
           -Dscan.tag.seed_${{ inputs.variant-prefix }}${{ inputs.variant }} \
           -Dscan.tag.seed-"${{ inputs.mode }}" \
           -Dscan.tag.seed \
+          -Dscan.tag.seed_$experiment_id_value \
           -Dscan.tag.seed_${{ inputs.experiment-id }}
       shell: bash
       env:
