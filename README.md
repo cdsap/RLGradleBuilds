@@ -129,17 +129,3 @@ The agent optimizes these Gradle build parameters:
 - `gradle_heap_gb`: Gradle JVM heap size in GB
 - `kotlin_heap_gb`: Kotlin daemon heap size in GB
 
-### Experiment Settings
-- **Max Iterations**: 10 per experiment
-- **Learning Rate**: Configurable in the RL agent
-- **Exploration Rate**: Balances exploration vs exploitation
-
-## 📈 Monitoring
-
-The dashboard provides real-time monitoring of:
-- Experiment status and progress
-- Current and best RL actions
-- Performance metrics (build time, GC times)
-- Iteration tracking
-- Reward values
-
