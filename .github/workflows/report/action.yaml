@@ -88,7 +88,7 @@ inputs:
   firebase-function-url:
     description: 'URL of the Firebase function for updating experiment status'
     required: false
-    default: "https://us-central1-rlgradleld.cloudfunctions.net"
+    default: "https://updateexperimentstatusdata-um6oa3imnq-uc.a.run.app"
   rl-actions:
     description: 'RL-generated action parameters (JSON string)'
     required: false
@@ -243,7 +243,7 @@ runs:
         # Update experiment status in Firestore
         if [ -n "${{ inputs.firebase-function-url }}" ]; then
           echo "Updating experiment status in Firestore..."
-          curl -X POST "${{ inputs.firebase-function-url }}/updateExperimentStatusData" \
+          curl -X POST "${{ inputs.firebase-function-url }}" \
             -H "Content-Type: application/json" \
             -d "{
               \"experiment_id\": \"${{ inputs.experiment-id }}\",
