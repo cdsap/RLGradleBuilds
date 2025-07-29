@@ -182,6 +182,8 @@ runs:
         MAX_BUILDS="${{ inputs.max-builds }}"
         REPOSITORY="${{ inputs.repository }}"
         EXPERIMENT_ID="${{ inputs.experiment-id }}"
+        API_KEY="${{ inputs.api-key }}"
+        RUN_ID="${{ inputs.run_id }}"
         
         # Create a unique variant ID for this specific action (for build comparison only)
         variant_id="${{ inputs.experiment-id }}_W${{ fromJson(inputs.rl-actions).max_workers }}_G${{ fromJson(inputs.rl-actions).gradle_heap_gb }}_K${{ fromJson(inputs.rl-actions).kotlin_heap_gb }}"
