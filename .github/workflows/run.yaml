@@ -86,7 +86,7 @@ jobs:
           cache-exclude-script: "${{ env.cache_exclude_content }}"
           task: "${{ github.event.inputs.task }}"
           mode: "${{ github.event.inputs.mode }}"
-          experiment-id: "${{ github.event.inputs.experiment_id || github.run_number }}"
+          experiment-id: "${{ github.event.inputs.experiment_id }}"
           variant: ${{ github.event.inputs.variant }}
           api-key: ${{ secrets.DV_ACCESS_KEY }}
           repository: ${{ github.event.inputs.repository }}
@@ -118,7 +118,7 @@ jobs:
         with:
           task: "${{ github.event.inputs.task }}"
           mode: "${{ github.event.inputs.mode }}"
-          experiment-id: "${{ github.event.inputs.experiment_id || github.repository_owner }}-${{ github.run_number }}"
+          experiment-id: "${{ github.event.inputs.experiment_id }}"
           execution-number: ${{ github.run_number }}
           variant: ${{ github.event.inputs.variant }}
           api-key: ${{ secrets.DV_ACCESS_KEY }}
@@ -147,7 +147,7 @@ jobs:
       - uses: ./.github/workflows/report
         with:
           task: "${{ github.event.inputs.task }}"
-          experiment-id: "${{ github.event.inputs.experiment_id || github.repository_owner }}-${{ github.run_number }}"
+          experiment-id: "${{ github.event.inputs.experiment_id }}"
           tags: "${{ github.repository_owner }}-${{ github.run_number }}_experiment_${{ github.event.inputs.variant }}"
           api-key: ${{ secrets.DV_ACCESS_TOKEN }}
           url: ${{ secrets.DV_URL }}

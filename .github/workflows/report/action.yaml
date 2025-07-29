@@ -182,16 +182,17 @@ runs:
         MAX_BUILDS="${{ inputs.max-builds }}"
         REPOSITORY="${{ inputs.repository }}"
         EXPERIMENT_ID="${{ inputs.experiment-id }}"
-        RUN_ID="${{ inputs.run_id }}"
-        API_KEY="${{ inputs.api-key }}"
-  
-         echo $tags
-         experiment_id_value=${{ inputs.experiment-id }}_W${{ fromJson(inputs.rl-actions).max_workers }}_G${{ fromJson(inputs.rl-actions).gradle_heap_gb }}_K${{ fromJson(inputs.rl-actions).kotlin_heap_gb }}
+        
+        # Create a unique variant ID for this specific action (for build comparison only)
+        variant_id="${{ inputs.experiment-id }}_W${{ fromJson(inputs.rl-actions).max_workers }}_G${{ fromJson(inputs.rl-actions).gradle_heap_gb }}_K${{ fromJson(inputs.rl-actions).kotlin_heap_gb }}"
+        
+        echo "Using experiment ID: $EXPERIMENT_ID"
+        echo "Using variant ID: $variant_id"
         
         ./build-experiment-results --url="https://ge.solutions-team.gradle.com/" \
                 --api-key="$API_KEY" \
                 --process-report \
-                --variants="$experiment_id_value"
+                --variants="$variant_id"
         
         cat $(ls -t experiment_results_*.csv | head -n 1)
         
@@ -220,10 +221,11 @@ runs:
         # Send feedback to RL agent if enabled
         if [ "${{ inputs.send-feedback }}" == "true" ] && [ -n "${{ inputs.rl-agent-url }}" ]; then
           echo "Sending feedback to RL agent..."
+          echo "Using experiment ID for RL agent: $EXPERIMENT_ID"
           curl -X POST "${{ inputs.rl-agent-url }}/send-feedback" \
             -H "Content-Type: application/json" \
             -d "{
-              \"experiment_id\": \"${{ inputs.experiment-id }}\",
+              \"experiment_id\": \"$EXPERIMENT_ID\",
               \"build_time\": ${MEAN_BUILD_DURATION},
               \"gradle_gc_time\": ${GRADLE_GC_TIME},
               \"kotlin_gc_time\": ${KOTLIN_GC_TIME},
@@ -239,14 +241,17 @@ runs:
         else
           echo "Skipping feedback to RL agent (disabled or no URL provided)"
         fi
+
+        echo "Final experiment ID being used: $EXPERIMENT_ID"
         
         # Update experiment status in Firestore
         if [ -n "${{ inputs.firebase-function-url }}" ]; then
           echo "Updating experiment status in Firestore..."
+          echo "Using experiment ID for Firebase: $EXPERIMENT_ID"
           curl -X POST "${{ inputs.firebase-function-url }}/updateExperimentStatusData" \
             -H "Content-Type: application/json" \
             -d "{
-              \"experiment_id\": \"${{ inputs.experiment-id }}\",
+              \"experiment_id\": \"$EXPERIMENT_ID\",
               \"status\": \"completed\",
               \"workflow_run_id\": \"${{ inputs.run_id }}\",
               \"build_time\": ${MEAN_BUILD_DURATION},

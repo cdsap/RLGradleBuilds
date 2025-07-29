@@ -83,14 +83,20 @@ runs:
     - name: Execute Gradle Build
       id: gradle-build
       run: |
-        experiment_id_value=${{ inputs.experiment-id }}_W${{ fromJson(inputs.rl-actions).max_workers }}_G${{ fromJson(inputs.rl-actions).gradle_heap_gb }}_K${{ fromJson(inputs.rl-actions).kotlin_heap_gb }}
+        # Use original experiment ID for tagging
+        experiment_id="${{ inputs.experiment-id }}"
+        # Create variant ID for build identification only
+        variant_id="${{ inputs.experiment-id }}_W${{ fromJson(inputs.rl-actions).max_workers }}_G${{ fromJson(inputs.rl-actions).gradle_heap_gb }}_K${{ fromJson(inputs.rl-actions).kotlin_heap_gb }}"
+        
+        echo "Using experiment ID: $experiment_id"
+        echo "Using variant ID: $variant_id"
         
         ./gradlew ${{ inputs.task }} ${{ inputs.extra-args }} \
           -Dscan.tag.${{ inputs.experiment-id }}_${{ inputs.variant-prefix }}${{ inputs.variant }} \
           -Dscan.tag."${{ inputs.mode }}" \
           -Dscan.tag.experiment \
-          -Dscan.tag."${{ inputs.experiment-id }}" \
-          -Dscan.tag."$experiment_id_value"
+          -Dscan.tag."$experiment_id" \
+          -Dscan.tag."$variant_id"
       shell: bash
       env:
         DEVELOCITY_ACCESS_KEY: ${{ inputs.api-key }}
