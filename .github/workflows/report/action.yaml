@@ -192,7 +192,7 @@ runs:
         ./build-experiment-results --url="https://ge.solutions-team.gradle.com/" \
                 --api-key="$API_KEY" \
                 --process-report \
-                --variants="$variant_id"
+                --variants=$variant_id
         
         cat $(ls -t experiment_results_*.csv | head -n 1)
         

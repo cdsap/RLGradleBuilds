@@ -131,6 +131,7 @@ runs:
       id: gradle-build
       run: |
         echo "11"
+        ls
         experiment_id_value="${{ inputs.experiment-id }}_W${{ fromJson(inputs.rl-actions).max_workers }}_G${{ fromJson(inputs.rl-actions).gradle_heap_gb }}_K${{ fromJson(inputs.rl-actions).kotlin_heap_gb }}"
         ./gradlew ${{ inputs.task }} ${{ inputs.extra-args }} \
           -Dscan.tag.seed_${{ inputs.variant-prefix }}${{ inputs.variant }} \
