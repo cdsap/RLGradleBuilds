@@ -180,6 +180,51 @@
       color: #666;
     }
     
+    .variant-toggle {
+      background-color: #17a2b8;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    .variant-toggle:hover {
+      background-color: #138496;
+    }
+    
+    .variants-container {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 10px 0;
+    }
+    
+    .variants-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      background: white;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .variants-table th,
+    .variants-table td {
+      padding: 8px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+      font-size: 12px;
+    }
+    .variants-table th {
+      background-color: #6c757d;
+      color: white;
+      font-weight: bold;
+    }
+    .variants-table tr:hover {
+      background-color: #f8f9fa;
+    }
+    
     .stats-summary {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -296,6 +341,22 @@
       }
     }
 
+    function toggleVariants(experimentId) {
+      const variantsRow = document.getElementById(`variants-${experimentId}`);
+      if (variantsRow) {
+        const isVisible = variantsRow.style.display !== 'none';
+        variantsRow.style.display = isVisible ? 'none' : 'table-row';
+        
+        // Update button text
+        const button = event.target;
+        if (button) {
+          button.textContent = isVisible ? 
+            `${variantsRow.querySelector('tbody').children.length} variants` : 
+            'Hide variants';
+        }
+      }
+    }
+
     // Initialize dashboard
     document.addEventListener('DOMContentLoaded', function() {
       loadAllExperiments();
@@ -331,6 +392,11 @@
       const running = allExperiments.filter(exp => exp.status === 'running').length;
       const completed = allExperiments.filter(exp => exp.status === 'completed').length;
       
+      // Calculate total variants across all experiments
+      const totalVariants = allExperiments.reduce((sum, exp) => {
+        return sum + (exp.variants?.length || 0);
+      }, 0);
+      
       // Find best reward from completed experiments
       const completedWithRewards = allExperiments.filter(exp => exp.status === 'completed' && exp.reward !== undefined);
       const bestReward = completedWithRewards.length > 0 
@@ -341,6 +407,24 @@
       document.getElementById('running-experiments').textContent = running;
       document.getElementById('completed-experiments').textContent = completed;
       document.getElementById('best-reward').textContent = bestReward;
+      
+      // Update or add total variants stat
+      let totalVariantsElement = document.getElementById('total-variants');
+      if (!totalVariantsElement) {
+        // Add total variants stat if it doesn't exist
+        const statsContainer = document.querySelector('.stats-summary');
+        if (statsContainer) {
+          const newStatCard = document.createElement('div');
+          newStatCard.className = 'stat-card';
+          newStatCard.innerHTML = `
+            <div class="stat-number" id="total-variants">${totalVariants}</div>
+            <div class="stat-label">Total Variants</div>
+          `;
+          statsContainer.appendChild(newStatCard);
+        }
+      } else {
+        totalVariantsElement.textContent = totalVariants;
+      }
     }
 
     function renderExperimentsTable() {
@@ -365,10 +449,10 @@
               <th>Experiment ID</th>
               <th>Repository</th>
               <th>Status</th>
-              <th>Iteration</th>
               <th>Current Action</th>
               <th>Best Action</th>
               <th>Reward</th>
+              <th>Variants</th>
               <th>Metrics</th>
               <th>Created</th>
             </tr>
@@ -379,8 +463,6 @@
       sortedExperiments.forEach(exp => {
         const statusClass = `status-${exp.status || 'pending'}`;
         const createdDate = parseFirestoreTimestamp(exp.created_at);
-        const iteration = exp.current_iteration || 1;
-        const maxIterations = exp.max_iterations || 10;
         
         // Format current action
         const currentAction = exp.rl_action ? 
@@ -391,6 +473,13 @@
         const bestAction = exp.best_action ? 
           `W:${exp.best_action.max_workers || 'N/A'}, G:${exp.best_action.gradle_heap_gb || 'N/A'}g, K:${exp.best_action.kotlin_heap_gb || 'N/A'}g` : 
           'N/A';
+        
+        // Format variants
+        const variants = exp.variants || [];
+        const variantsCount = variants.length;
+        const variantsHtml = variantsCount > 0 ? 
+          `<button onclick="toggleVariants('${exp.id}')" class="variant-toggle">${variantsCount} variants</button>` : 
+          'No variants';
         
         // Format metrics
         let metricsHtml = '';
@@ -418,14 +507,66 @@
             <td><strong>${exp.id}</strong></td>
             <td>${exp.repository}</td>
             <td><span class="status-badge ${statusClass}">${exp.status || 'pending'}</span></td>
-            <td>${iteration}/${maxIterations}</td>
             <td><div class="rl-actions" title="${JSON.stringify(exp.rl_action, null, 2)}">${currentAction}</div></td>
             <td><div class="rl-actions" title="${JSON.stringify(exp.best_action, null, 2)}">${bestAction}</div></td>
             <td>${exp.reward !== undefined ? exp.reward.toFixed(2) : 'N/A'}</td>
+            <td>${variantsHtml}</td>
             <td>${metricsHtml}</td>
             <td>${createdDate.toLocaleString()}</td>
           </tr>
         `;
+        
+        // Add variants details row if there are variants
+        if (variantsCount > 0) {
+          tableHtml += `
+            <tr id="variants-${exp.id}" class="variants-row" style="display: none;">
+              <td colspan="10">
+                <div class="variants-container">
+                  <h4>Variants for ${exp.id}</h4>
+                  <table class="variants-table">
+                    <thead>
+                      <tr>
+                        <th>Variant ID</th>
+                        <th>Iteration</th>
+                        <th>Action</th>
+                        <th>Reward</th>
+                        <th>Build Time</th>
+                        <th>Gradle GC</th>
+                        <th>Kotlin GC</th>
+                        <th>Created</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+          `;
+          
+          variants.forEach(variant => {
+            const variantAction = variant.rl_action ? 
+              `W:${variant.rl_action.max_workers}, G:${variant.rl_action.gradle_heap_gb}g, K:${variant.rl_action.kotlin_heap_gb}g` : 
+              'N/A';
+            const variantCreatedDate = parseFirestoreTimestamp(variant.created_at);
+            
+            tableHtml += `
+              <tr>
+                <td>${variant.variant_id}</td>
+                <td>${variant.iteration}</td>
+                <td><div class="rl-actions" title="${JSON.stringify(variant.rl_action, null, 2)}">${variantAction}</div></td>
+                <td>${variant.reward !== undefined ? variant.reward.toFixed(2) : 'N/A'}</td>
+                <td>${variant.metrics?.build_time || 'N/A'}ms</td>
+                <td>${variant.metrics?.gradle_gc_time || 'N/A'}</td>
+                <td>${variant.metrics?.kotlin_gc_time || 'N/A'}</td>
+                <td>${variantCreatedDate.toLocaleString()}</td>
+              </tr>
+            `;
+          });
+          
+          tableHtml += `
+                    </tbody>
+                  </table>
+                </div>
+              </td>
+            </tr>
+          `;
+        }
       });
       
       tableHtml += `
@@ -453,7 +594,7 @@
       
       try {
         // First, get an action from the RL agent
-        const rlResponse = await fetch('https://rl-agent-um6oa3imnq-uc.a.run.app/get-action', {
+        const rlResponse = await fetch('https://rl-agent-428721187836.us-central1.run.app/get-action', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'

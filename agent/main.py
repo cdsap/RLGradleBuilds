@@ -64,6 +64,20 @@ def get_best_action(q_table: Dict[str, float], exploration_rate: float = 0.1) ->
         "kotlin_heap_gb": int(kotlin_heap)
     }
 
+def get_best_action_from_q_table(q_table: Dict[str, float]) -> dict:
+    """Get the best action from Q-table (highest Q-value)"""
+    if not q_table:
+        return generate_random_action()
+    
+    best_key = max(q_table.keys(), key=lambda k: q_table[k])
+    # Convert key back to action dict
+    parts = best_key.split('_')
+    return {
+        "max_workers": int(parts[0]),
+        "gradle_heap_gb": int(parts[1]),
+        "kotlin_heap_gb": int(parts[2])
+    }
+
 def calculate_reward(build_time: float, gradle_gc_time: float, kotlin_gc_time: float, kotlin_compile_duration: Optional[float] = None) -> float:
     """
     Calculate reward based on build time, Gradle GC time, and Kotlin GC time.
@@ -214,6 +228,10 @@ async def send_feedback(req: FeedbackRequest):
             q_table = update_q_table(q_table, last_action, reward)
             logger.info(f"Updated Q-table with reward {reward} for action {last_action}")
         
+        # Get the best action from the updated Q-table
+        best_action = get_best_action_from_q_table(q_table)
+        logger.info(f"Best action from Q-table: {best_action}")
+        
         # Store the feedback and updated Q-table
         doc_ref.set({
             "build_time": req.build_time,
@@ -230,6 +248,7 @@ async def send_feedback(req: FeedbackRequest):
         return {
             "message": "Feedback received successfully",
             "calculated_reward": reward,
+            "best_action": best_action,
             "metrics": {
                 "build_time": req.build_time,
                 "gradle_gc_time": req.gradle_gc_time,
