@@ -188,7 +188,7 @@ runs:
         
         echo "Using experiment ID: $EXPERIMENT_ID"
         echo "Using variant ID: $variant_id"
-        
+        echo "--variants=$variant_id" 
         ./build-experiment-results --url="https://ge.solutions-team.gradle.com/" \
                 --api-key="$API_KEY" \
                 --process-report \
