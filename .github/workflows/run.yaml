@@ -14,7 +14,7 @@ on:
       iterations:
         description: "Number of iterations for the experiment"
         required: true
-        default: "10"
+        default: "1"
       mode:
         description: "Type of execution relative to caching"
         type: choice
@@ -131,8 +131,6 @@ jobs:
           jdk_vendor: ${{ fromJson(github.event.inputs.java_args).javaVendorVariantA }}
           rl-actions: "${{ github.event.inputs.rl_actions }}"
       - uses: actions/checkout@v4
-
-
 
   report:
     permissions:
