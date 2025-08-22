@@ -50,7 +50,7 @@ on:
         required: false
         default: "{}"
 
-run-name: "${{ github.event.inputs.repository }}-${{ github.event.inputs.mode }}-${{ github.event.inputs.variant }}-${{ github.event.inputs.task }}"
+run-name: "${{ github.event.inputs.repository }}-${{ github.event.inputs.rl_actions }}-${{ github.event.inputs.variant }}-${{ github.event.inputs.task }}-${{ github.event.inputs.mode }}"
 
 jobs:
   iterations:
