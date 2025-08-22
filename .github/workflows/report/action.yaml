@@ -5,50 +5,18 @@ inputs:
   api-key:
     description: 'API key for accessing Develocity services'
     required: true
-  url:
-    description: 'URL of the Develocity server'
-    required: true
   task:
     description: 'The task used in the experiment'
     required: true
-  max-builds:
-    description: 'Maximum number of builds to fetch for the comparison (default is 200)'
-    required: false
-    default: 200
   experiment-id:
     description: 'Unique identifier for the experiment'
     required: true
   tags:
     description: 'Comma-separated tags to filter the builds for comparison'
     required: true
-  profile:
-    description: 'Enable or disable profiling during the comparison'
-    required: true
   gh_token:
     description: 'GitHub token for authentication'
     required: true
-  taskpathreport:
-    description: 'Enable or disable task path reporting'
-    required: true
-  processreport:
-    description: 'Enable or disable process reporting'
-    required: true
-  kotlinreport:
-    description: 'Enable or disable Kotlin build reporting'
-    required: true
-  tasktypereport:
-    description: 'Enable or disable task type reporting'
-    required: true
-  resourceusagereport:
-    description: 'Enable or disable resource usage reporting'
-    required: true
-  onlycacheableoutcome:
-    description: 'Enable or disable reporting only for cacheable outcomes'
-    required: true
-  thresholdtaskduration:
-    description: 'Threshold of task duration for the task path report'
-    required: true
-    default: 1000
   repository:
     description: 'GitHub repository to check out'
     required: true
@@ -58,25 +26,6 @@ inputs:
   mode:
     description: 'Mode of the experiment'
     required: false
-  experiment_title:
-    description: 'Title of the experiment'
-    required: false
-  open-ai-request: 
-    description: 'OpenAI request'
-    required: true
-    default: false
-  open-ai-api-key:
-    description: 'OpenAI API key'
-    required: false
-    default: ""
-  deploy_results:
-    description: 'Deploy results'
-    required: true
-    default: false
-  deployment-key:
-    description: 'Deployment key'
-    required: true
-    default: ""
   rl-agent-url:
     description: 'URL of the RL agent for sending feedback'
     required: false
@@ -125,61 +74,10 @@ runs:
 
         # Parse and format tags input into the required format
         tags="${{ inputs.tags }}"
-    
-
-        # Set optional flags based on input values
-        profile=""
-        if [ "${{ inputs.profile }}" == "true" ]; then
-          profile="--profile"
-        fi
-
-        taskpathreport="--task-path-report"
-        if [ "${{ inputs.taskpathreport }}" == "false" ]; then
-          taskpathreport="--no-task-path-report"
-        fi
-
-        processreport="--process-report"
-        if [ "${{ inputs.processreport }}" == "false" ]; then
-          processreport="--no-process-report"
-        fi
-
-        kotlinreport="--kotlin-build-report"
-        if [ "${{ inputs.kotlinreport }}" == "false" ]; then
-          kotlinreport="--no-kotlin-build-report"
-        fi
-
-        tasktypereport="--task-type-report"
-        if [ "${{ inputs.tasktypereport }}" == "false" ]; then
-          tasktypereport="--no-task-type-report"
-        fi
-
-        resourceusagereport="--resource-usage-report"
-        if [ "${{ inputs.resourceusagereport }}" == "false" ]; then
-          resourceusagereport="--no-resource-usage-report"
-        fi
-
-        onlycacheableoutcome="--only-cacheable-outcome"
-        if [ "${{ inputs.onlycacheableoutcome }}" == "false" ]; then
-          onlycacheableoutcome="--no-only-cacheable-outcome"
-        fi
-
-        gcreport="--gc-report"  
-        if [ "${{ inputs.gcreport }}" == "false" ]; then
-          gcreport="--no-gc-report"
-        fi 
-
-        if [ "${{ inputs.open-ai-request }}" == "true" ]; then
-          openai_request="--open-ai-request"
-        else
-          openai_request="--no-open-ai-request"
-        fi
-
-
-        thresholdtaskduration="--threshold-task-duration ${{ inputs.thresholdtaskduration }}"
-
+        
         # Execute the comparison with the appropriate arguments
         URL="${{ inputs.url }}"
-        MAX_BUILDS="${{ inputs.max-builds }}"
+        MAX_BUILDS="50"
         REPOSITORY="${{ inputs.repository }}"
         EXPERIMENT_ID="${{ inputs.experiment-id }}"
         API_KEY="${{ inputs.api-key }}"
@@ -191,7 +89,7 @@ runs:
         echo "Using experiment ID: $EXPERIMENT_ID"
         echo "Using variant ID: $variant_id"
         echo "--variants=$variant_id" 
-        ./build-experiment-results --url="https://ge.solutions-team.gradle.com/" \
+        ./build-experiment-results --url="$URL" \
                 --api-key="$API_KEY" \
                 --process-report \
                 --variants=$variant_id

@@ -149,24 +149,10 @@ jobs:
           api-key: ${{ secrets.DV_ACCESS_TOKEN }}
           url: ${{ secrets.DV_URL }}
           gh_token: ${{ secrets.GITHUB_TOKEN }}
-          profile: false
           mode: "${{ github.event.inputs.mode }}"
           repository: ${{ github.event.inputs.repository }}
           run_id: ${{ github.run_id }}
-          experiment_title: ${{ fromJson(github.event.inputs.extra_report_args).experiment_title }}
-          taskpathreport: ${{ fromJson(github.event.inputs.extra_report_args).taskpath_report }}
-          tasktypereport: ${{ fromJson(github.event.inputs.extra_report_args).tasktype_report }}
-          processreport: ${{ fromJson(github.event.inputs.extra_report_args).process_report }}
-          gcreport: ${{ fromJson(github.event.inputs.extra_report_args).gc_report }}
-          kotlinreport: ${{ fromJson(github.event.inputs.extra_report_args).kotlin_build_report }}
-          resourceusagereport: ${{ fromJson(github.event.inputs.extra_report_args).resource_usage_report }}
-          onlycacheableoutcome: ${{ fromJson(github.event.inputs.extra_report_args).only_cacheable_outcome }}
-          thresholdtaskduration: ${{ fromJson(github.event.inputs.extra_report_args).threshold_task_duration }} 
-          deploy_results: ${{ fromJson(github.event.inputs.extra_report_args).deploy_results }}
-          open-ai-request: ${{ fromJson(github.event.inputs.extra_report_args).open_ai_request }}
-          open-ai-api-key: ${{ secrets.OPEN_API_KEY }}
-          deployment-key: ${{ secrets.GH_BUILD_DEPLOYMENT }}
-          rl-agent-url: "https://rl-agent-428721187836.us-central1.run.app"
+          rl-agent-url: "${{ secrets.RL_AGENT_URL }}"
           send-feedback: "true"
-          firebase-function-url: "https://us-central1-rlgradleld.cloudfunctions.net"
+          firebase-function-url: "${{ secrets.RL_FUNCTION_URL }}"
           rl-actions: "${{ github.event.inputs.rl_actions }}"

@@ -36,9 +36,6 @@ inputs:
   extra-args:
     description: 'Extra arguments to pass to the Gradle command'
     required: true
-  cache-url:
-    description: 'URL for the cache node if applicable'
-    required: false
   cache-excludes:
     description: 'Patterns to exclude from cache'
     required: true
@@ -101,4 +98,3 @@ runs:
       env:
         DEVELOCITY_ACCESS_KEY: ${{ inputs.api-key }}
         GRADLE_BUILD_ACTION_CACHE_KEY_JOB: 'seed'
-        CI_URL_CACHE_NODE: ${{ inputs.cache-url }}
