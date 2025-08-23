@@ -22,5 +22,4 @@ COPY . .
 # Cloud Run will inject PORT
 ENV PORT=8080
 
-# Start app with Uvicorn
-CMD exec uvicorn main:app --host 0.0.0.0 --port ${PORT}
+CMD exec uvicorn main:app --host 0.0.0.0 --port $PORT

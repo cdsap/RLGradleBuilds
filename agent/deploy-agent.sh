@@ -39,8 +39,7 @@ gcloud run deploy $SERVICE_NAME \
   --allow-unauthenticated \
   --memory 1Gi \
   --cpu 1 \
-  --max-instances 10
-
+  --max-instances 10  
 # Get the service URL
 SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region=$REGION --project=$PROJECT_ID --format="value(status.url)")
 

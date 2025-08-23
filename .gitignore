@@ -12,15 +12,21 @@ CURRENT_VALUES.backup
 firebase-debug.log
 firebase-debug.*.log
 
-# Google Cloud configuration
-*.json
+# Google Cloud configuration - exclude sensitive config files
+gcp-credentials.json
+service-account-key.json
+*-key.json
+*-credentials.json
+
+# Keep essential project files
 !package.json
 !package-lock.json
+!firebase.json
+!tsconfig.json
+!next.config.js
 
 # Working files with hardcoded URLs (exclude from GitHub)
-.github/workflows/run.yaml
-.github/workflows/report/action.yaml
-public/index.html
+public/config.js
 remove_pending_experiments.sh
 delete_experiment.sh
 cancel_all_experiments.sh

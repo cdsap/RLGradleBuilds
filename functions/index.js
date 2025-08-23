@@ -13,6 +13,8 @@ const db = admin.firestore();
 // Global settings
 setGlobalOptions({ maxInstances: 10 });
 
+
+
 /**
  * Trigger experiment function
  * Requires GITHUB_TOKEN secret
@@ -21,6 +23,7 @@ exports.triggerExperiment = onRequest({
   cors: true,
   maxInstances: 10,
   secrets: ["GITHUB_TOKEN"], // <-- BIND THE SECRET
+  env: ["RL_AGENT_URL", "EXPERIMENTS_ENABLED"], // <-- ADD ENVIRONMENT VARIABLE
 }, async (request, response) => {
   // Enable CORS
   response.set('Access-Control-Allow-Origin', '*');
@@ -38,18 +41,97 @@ exports.triggerExperiment = onRequest({
   }
 
   try {
-    const { repository } = request.body;
-
-    if (!repository) {
-      response.status(400).json({ error: 'Repository is required' });
+    // Check if experiments are enabled
+    const experimentsEnabled = process.env.EXPERIMENTS_ENABLED !== 'false';
+    if (!experimentsEnabled) {
+      response.status(403).json({ 
+        error: 'Experiment creation is currently disabled',
+        message: `Experiments are temporarily disabled. Please try again later. To request access or report issues, create a new issue at: https://github.com/${process.env.GITHUB_REPOSITORY || 'your-username/your-repo'}/issues/new`
+      });
       return;
     }
 
+    const { repository, task, selection_method, max_iterations } = request.body;
+    
+    // Validate required fields
+    if (!repository) {
+        response.status(400).json({ error: 'Repository is required' });
+        return;
+    }
+
+    // Set default values
+    const gradleTask = task || 'assembleDebug';
+    const selectionMethod = 'qtable'; // Always use Q-table based selection
+    const maxIterations = max_iterations || 15; // Default to 15 if not specified
+    
+    // Calculate GitHub Actions iterations based on max_iterations
+    let githubActionsIterations = 10; // Default
+    if (maxIterations === 30) {
+        githubActionsIterations = 5;
+    } else if (maxIterations === 50) {
+        githubActionsIterations = 3;
+    } else if (maxIterations === 15) {
+        githubActionsIterations = 10;
+    }
+    // For any other value, keep default of 10
+    
+    logger.info('Starting experiment', { 
+        repository, 
+        task: gradleTask, 
+        selection_method: selectionMethod,
+        max_iterations: maxIterations,
+        github_actions_iterations: githubActionsIterations
+    });
+
+    // Check for concurrent experiments - only allow one running experiment at a time
+    // Use separate queries since Firestore doesn't support 'in' with orderBy efficiently
+    const createdExperiments = await db.collection('experiments')
+      .where('status', '==', 'created')
+      .orderBy('created_at', 'desc')
+      .limit(1)
+      .get();
+    
+    const runningExperiments = await db.collection('experiments')
+      .where('status', '==', 'running')
+      .orderBy('created_at', 'desc')
+      .limit(1)
+      .get();
+    
+    // Combine and find the most recent
+    const allRecentExperiments = [
+      ...createdExperiments.docs.map(doc => ({ id: doc.id, ...doc.data() })),
+      ...runningExperiments.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+    ].sort((a, b) => b.created_at.toMillis() - a.created_at.toMillis());
+    
+    if (allRecentExperiments.length > 0) {
+      const latestExperiment = allRecentExperiments[0];
+      const timeSinceCreation = Date.now() - latestExperiment.created_at.toMillis();
+      const maxWaitTime = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
+      
+      // If the latest experiment is still within reasonable time and running, block new experiment
+      if (timeSinceCreation < maxWaitTime && ['created', 'running'].includes(latestExperiment.status)) {
+        logger.warn('Concurrent experiment blocked', { 
+          existingExperimentId: latestExperiment.id, 
+          existingStatus: latestExperiment.status,
+          timeSinceCreation: Math.round(timeSinceCreation / 1000 / 60) + ' minutes'
+        });
+        response.status(409).json({ 
+          error: 'Another experiment is currently running. Please wait for it to complete before starting a new one.',
+          existingExperimentId: latestExperiment.id,
+          existingStatus: latestExperiment.status
+        });
+        return;
+      }
+    }
+    
     const experimentId = `experiment-${Date.now()}`;
 
     const experimentData = {
       id: experimentId,
       repository,
+      task: gradleTask,
+      selection_method: 'qtable', // Always use Q-table based selection
+      max_iterations: maxIterations,
       status: 'created',
       variants: [],
       created_at: admin.firestore.FieldValue.serverTimestamp(),
@@ -66,7 +148,7 @@ exports.triggerExperiment = onRequest({
 
     // Generate RL action for this experiment
     try {
-      const rlAgentUrl = process.env.RL_AGENT_URL || 'https://rl-agent-428721187836.us-central1.run.app';
+      const rlAgentUrl = process.env.RL_AGENT_URL || 'https://your-rl-agent-url.run.app';
       const actionResponse = await fetch(`${rlAgentUrl}/get-action`, {
         method: 'POST',
         headers: {
@@ -101,12 +183,12 @@ exports.triggerExperiment = onRequest({
       repository: repository,
       experiment_id: experimentId,
       rl_actions: JSON.stringify(rlAction || {}),
-      task: ':help', // Default task, could be made configurable
-      iterations: '10',
+      task: gradleTask, // Use the provided task
+      iterations: githubActionsIterations.toString(),
       mode: 'dependencies cache',
       java_args: '{javaVersionVariantA:\'17\',javaVersionVariantB:\'17\',javaVendorVariantA:\'zulu\',javaVendorVariantB:\'zulu\'}',
       extra_build_args: extraBuildArgs ? `{extraArgsVariantA:'${extraBuildArgs}',extraArgsVariantB:' '}` : '{extraArgsVariantA:\' \',extraArgsVariantB:\' \'}',
-      extra_report_args: '{deploy_results:\'false\',experiment_title:\'\', open_ai_request:\'true\', report_enabled:\'true\',tasktype_report:\'true\',taskpath_report:\'true\',kotlin_build_report:\'false\',process_report:\'false\',resource_usage_report:\'true\',gc_report:\'false\',only_cacheable_outcome:\'false\',threshold_task_duration:\'1000\'}',
+      extra_report_args: '{deploy_results:\'false\',experiment_title:\'\', open_ai_request:\'true\', report_enabled:\'true\',tasktype_report:\'true\',taskpath_report:\'true\',kotlin_build_report:\'false\',process_report:\'false\',resource_usage_report:\'true\',gc_report:\'true\',only_cacheable_outcome:\'false\',threshold_task_duration:\'1000\'}',
       variant: 'main'
     };
 
@@ -124,9 +206,9 @@ exports.triggerExperiment = onRequest({
       throw new Error('GitHub token is required. Ensure GITHUB_TOKEN is added as a secret.');
     }
 
-    // Trigger GitHub Actions workflow in the current repository
-    const workflowResponse = await fetch(
-      `https://api.github.com/repos/cdsap/RLGradleBuilds/actions/workflows/run.yaml/dispatches`,
+                  // Trigger GitHub Actions workflow in the current repository
+        const workflowResponse = await fetch(
+          `https://api.github.com/repos/${process.env.GITHUB_REPOSITORY || 'your-username/your-repo'}/actions/workflows/run.yaml/dispatches`,
       {
         method: 'POST',
         headers: {
@@ -164,6 +246,32 @@ exports.triggerExperiment = onRequest({
     logger.error('Error triggering experiment:', error);
     response.status(500).json({
       error: 'Failed to trigger experiment',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Check if experiments are enabled
+ */
+exports.checkExperimentsEnabled = onRequest({
+  cors: true,
+  maxInstances: 10,
+  env: ["EXPERIMENTS_ENABLED"], // <-- ADD ENVIRONMENT VARIABLE
+}, async (request, response) => {
+  response.set('Access-Control-Allow-Origin', '*');
+  
+  try {
+    const experimentsEnabled = process.env.EXPERIMENTS_ENABLED !== 'false';
+    
+    response.json({
+      experiments_enabled: experimentsEnabled,
+      message: experimentsEnabled ? 'Experiments are enabled' : 'Experiments are currently disabled'
+    });
+  } catch (error) {
+    logger.error('Error checking experiments status:', error);
+    response.status(500).json({
+      error: 'Failed to check experiments status',
       details: error.message
     });
   }
@@ -229,6 +337,7 @@ exports.getAllExperiments = onRequest({
       const experiment = {
         id: doc.id,
         repository: data.repository,
+        task: data.task,
         status: data.status,
         rl_action: data.rl_action,
         best_action: data.best_action,
@@ -258,6 +367,7 @@ exports.updateExperimentStatusData = onRequest({
   cors: true,
   maxInstances: 10,
   secrets: ["GITHUB_TOKEN"], // <-- BIND THE SECRET
+  env: ["RL_AGENT_URL"], // <-- ADD ENVIRONMENT VARIABLE
 }, async (request, response) => {
   response.set('Access-Control-Allow-Origin', '*');
   if (request.method !== 'POST') {
@@ -304,8 +414,41 @@ exports.updateExperimentStatusData = onRequest({
     });
     
     if (build_time !== undefined && gradle_gc_time !== undefined && kotlin_gc_time !== undefined) {
+      // Check if we've reached maximum iterations BEFORE processing
+      const experimentDoc = await db.collection('experiments').doc(experiment_id).get();
+      const experimentData = experimentDoc.data();
+      const variants = experimentData.variants || [];
+      const maxIterations = experimentData.max_iterations || 15; // Use experiment's max_iterations or default to 15
+      
+      if (variants.length >= maxIterations) {
+        logger.info('Experiment reached maximum iterations, stopping continuous learning', { 
+          experiment_id, 
+          current_iterations: variants.length, 
+          max_iterations: maxIterations 
+        });
+        
+        // Update experiment status to completed
+        await db.collection('experiments').doc(experiment_id).update({
+          status: 'completed',
+          final_message: `Experiment completed after ${variants.length} iterations`,
+          updated_at: admin.firestore.FieldValue.serverTimestamp()
+        });
+        
+        return;
+      }
+      
       try {
-        const rlAgentUrl = process.env.RL_AGENT_URL || 'https://rl-agent-428721187836.us-central1.run.app';
+        const rlAgentUrl = process.env.RL_AGENT_URL || 'https://your-rl-agent-url.run.app';
+        // Get the current RL action from the experiment document
+        const experimentDoc = await db.collection('experiments').doc(experiment_id).get();
+        const experimentData = experimentDoc.data();
+        const currentRlAction = experimentData.rl_action;
+        
+        if (!currentRlAction) {
+          logger.error('No current RL action found in experiment', { experiment_id });
+          return;
+        }
+        
         const feedbackResponse = await fetch(`${rlAgentUrl}/send-feedback`, {
           method: 'POST',
           headers: {
@@ -316,7 +459,8 @@ exports.updateExperimentStatusData = onRequest({
             build_time: build_time,
             gradle_gc_time: gradle_gc_time,
             kotlin_gc_time: kotlin_gc_time,
-            kotlin_compile_duration: kotlin_compile_duration
+            kotlin_compile_duration: kotlin_compile_duration,
+            rl_action: currentRlAction
           })
         });
 
@@ -324,8 +468,8 @@ exports.updateExperimentStatusData = onRequest({
           const feedbackResult = await feedbackResponse.json();
           logger.info('Feedback sent to RL agent', { experiment_id, feedbackResult });
           
-          // Store the best action and reward from the RL agent
-          if (feedbackResult.best_action && feedbackResult.calculated_reward !== undefined) {
+          // Always store the variant data for this iteration
+          if (feedbackResult.calculated_reward !== undefined) {
             // Get the current RL action from the experiment document
             const experimentDoc = await db.collection('experiments').doc(experiment_id).get();
             const experimentData = experimentDoc.data();
@@ -350,14 +494,43 @@ exports.updateExperimentStatusData = onRequest({
               created_at: new Date()
             };
 
-            // Update experiment with new variant and best action
-            await db.collection('experiments').doc(experiment_id).update({
-              best_action: feedbackResult.best_action,
-              reward: feedbackResult.calculated_reward,
+            // Update experiment with new variant
+            const updateData = {
               variants: admin.firestore.FieldValue.arrayUnion(variantData),
               updated_at: admin.firestore.FieldValue.serverTimestamp()
-            });
-            logger.info('Stored variant and best action', { experiment_id, variant: variantData.variant_id, reward: feedbackResult.calculated_reward });
+            };
+            
+            // Only update best_action if it exists
+            if (feedbackResult.best_action) {
+              updateData.best_action = feedbackResult.best_action;
+              updateData.reward = feedbackResult.calculated_reward;
+            }
+            
+            await db.collection('experiments').doc(experiment_id).update(updateData);
+            logger.info('Stored variant data', { experiment_id, variant: variantData.variant_id, reward: feedbackResult.calculated_reward });
+            
+            // Check if we've reached maximum iterations AFTER storing the variant
+            const updatedExperimentDoc = await db.collection('experiments').doc(experiment_id).get();
+            const updatedExperimentData = updatedExperimentDoc.data();
+            const updatedVariants = updatedExperimentData.variants || [];
+            const currentMaxIterations = updatedExperimentData.max_iterations || 15;
+            
+            if (updatedVariants.length >= currentMaxIterations) {
+              logger.info('Experiment reached maximum iterations after storing variant, stopping continuous learning', { 
+                experiment_id, 
+                current_iterations: updatedVariants.length, 
+                max_iterations: currentMaxIterations 
+              });
+              
+              // Update experiment status to completed
+              await db.collection('experiments').doc(experiment_id).update({
+                status: 'completed',
+                final_message: `Experiment completed after ${updatedVariants.length} iterations`,
+                updated_at: admin.firestore.FieldValue.serverTimestamp()
+              });
+              
+              return;
+            }
           }
           
           // Always trigger next action for continuous learning
@@ -370,7 +543,7 @@ exports.updateExperimentStatusData = onRequest({
               logger.info('Scheduling next action for same experiment', { experiment_id, repository });
               
               // Generate next RL action for the same experiment
-              const rlAgentUrl = process.env.RL_AGENT_URL || 'https://rl-agent-428721187836.us-central1.run.app';
+              const rlAgentUrl = process.env.RL_AGENT_URL || 'https://your-rl-agent-url.run.app';
               logger.info('Calling RL agent for next action', { experiment_id, rlAgentUrl });
               
               const actionResponse = await fetch(`${rlAgentUrl}/get-action`, {
@@ -400,6 +573,22 @@ exports.updateExperimentStatusData = onRequest({
                   updated_at: admin.firestore.FieldValue.serverTimestamp()
                 });
                 
+                // Get the original task from the experiment data
+                const experimentDoc = await db.collection('experiments').doc(experiment_id).get();
+                const experimentData = experimentDoc.data();
+                const originalTask = experimentData.task || ':help';
+                
+                // Calculate GitHub Actions iterations for continuous learning
+                const maxIterations = experimentData.max_iterations || 15;
+                let githubActionsIterations = 10; // Default
+                if (maxIterations === 30) {
+                    githubActionsIterations = 5;
+                } else if (maxIterations === 50) {
+                    githubActionsIterations = 3;
+                } else if (maxIterations === 15) {
+                    githubActionsIterations = 10;
+                }
+                
                 // Prepare workflow inputs for next action
                 const extraBuildArgs = `--max-workers ${rlAction.max_workers} -Dorg.gradle.jvmargs="-Xmx${rlAction.gradle_heap_gb}g" -Dkotlin.compiler.jvmTarget=17 -Dkotlin.compiler.jvmArgs="-Xmx${rlAction.kotlin_heap_gb}g"`;
                 
@@ -407,12 +596,12 @@ exports.updateExperimentStatusData = onRequest({
                   repository: repository,
                   experiment_id: experiment_id,
                   rl_actions: JSON.stringify(rlAction),
-                  task: ':help',
-                  iterations: '10',
+                  task: originalTask,
+                  iterations: githubActionsIterations.toString(),
                   mode: 'dependencies cache',
                   java_args: '{javaVersionVariantA:\'17\',javaVersionVariantB:\'17\',javaVendorVariantA:\'zulu\',javaVendorVariantB:\'zulu\'}',
                   extra_build_args: `{extraArgsVariantA:'${extraBuildArgs}',extraArgsVariantB:' '}`,
-                  extra_report_args: '{deploy_results:\'false\',experiment_title:\'\', open_ai_request:\'true\', report_enabled:\'true\',tasktype_report:\'true\',taskpath_report:\'true\',kotlin_build_report:\'false\',process_report:\'false\',resource_usage_report:\'true\',gc_report:\'false\',only_cacheable_outcome:\'false\',threshold_task_duration:\'1000\'}',
+                  extra_report_args: '{deploy_results:\'false\',experiment_title:\'\', open_ai_request:\'true\', report_enabled:\'true\',tasktype_report:\'true\',taskpath_report:\'true\',kotlin_build_report:\'false\',process_report:\'false\',resource_usage_report:\'true\',gc_report:\'true\',only_cacheable_outcome:\'false\',threshold_task_duration:\'1000\'}',
                   variant: 'main'
                 };
                 
@@ -424,7 +613,7 @@ exports.updateExperimentStatusData = onRequest({
                   logger.info('Making GitHub API call', { experiment_id, workflowInputs });
                   
                   const workflowResponse = await fetch(
-                    `https://api.github.com/repos/cdsap/RLGradleBuilds/actions/workflows/run.yaml/dispatches`,
+                    `https://api.github.com/repos/${process.env.GITHUB_REPOSITORY || 'your-username/your-repo'}/actions/workflows/run.yaml/dispatches`,
                     {
                       method: 'POST',
                       headers: {
